@@ -27,7 +27,6 @@ public class OkHttpUtil {
     private OkHttpClient mOkHttpClient;
     private Gson mGson = new Gson();
     private Handler mMainHandler;
-    private Map<String,Call> mCallMap = new ConcurrentHashMap<>();
     private OkHttpUtil() {
         mOkHttpClient = new OkHttpClient();
         mMainHandler = new Handler(Looper.getMainLooper());
@@ -69,19 +68,19 @@ public class OkHttpUtil {
     private <T> void executeRequest(Request request,final boolean postToUIThread,final ResponseCallBack<T> responseCallBack) {
 
         Call newCall = mOkHttpClient.newCall(request);
-        mCallMap.put(request.tag().toString(),newCall);
+
 
         newCall.enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
                 postFailInformation(call,e,postToUIThread,responseCallBack);
-                mCallMap.remove(call.request().tag().toString());
+
             }
 
             @Override
             public void onResponse( Call call, Response response) throws IOException {
                 T result ;
-                mCallMap.remove(call.request().tag().toString());
+
                 try {
                     if(String.class.equals(responseCallBack.tClass)) {
                         result = (T) response.body().string();
@@ -124,12 +123,12 @@ public class OkHttpUtil {
         });
     }
 
-    public void  cancelRequest(String url) {
-        Call call = mCallMap.get(url);
-        if(call!=null) {
-            call.cancel();
+    public void  cancelRequest(@Nullable String url) {
+        for (Call call :mOkHttpClient.dispatcher().queuedCalls()) {
+            if(call!=null&&call.request().tag().toString().equals(url)) {
+                call.cancel();
+            }
         }
-        mCallMap.remove(url);
     }
 
 
@@ -139,12 +138,7 @@ public class OkHttpUtil {
         }
         mMainHandler.removeCallbacksAndMessages(null);
 
-        for(Call call:mCallMap.values()) {
-            if(call!=null) {
-                call.cancel();
-            }
-        }
-        mCallMap.clear();
+        mOkHttpClient.dispatcher().cancelAll();
     }
 
 }
