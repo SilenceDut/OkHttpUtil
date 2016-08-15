@@ -20,14 +20,14 @@ public class MainActivity extends AppCompatActivity {
         mResult = (TextView)findViewById(R.id.resultTv) ;
         for(int i=0;i<20;i++) {
             final int finalI = i;
-            OkHttpUtil.getInstance().getAsync("http://nbaplus.sinaapp.com/api/v1.0/news/update", new ResponseCallBack<News>() {
+            OkHttpUtil.getInstance().getAsync("http://nbaplus.sinaapp.com/api/v1.0/news/update", OkHttpUtil.PostThread.UI_THREAD,new ResponseCallBack<String>() {
                 @Override
                 public void onFailure(Call request, Exception e) {
                     mResult.setText(e.getMessage());
                 }
 
                 @Override
-                public void onSucceeded(Call call, News news) {
+                public void onSucceeded(Call call, String news) {
 
                     mResult.setText(mResult.getText()+"\n"+"i:"+ finalI+news.toString());
                 }

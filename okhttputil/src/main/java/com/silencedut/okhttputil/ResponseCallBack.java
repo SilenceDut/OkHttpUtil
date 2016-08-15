@@ -10,7 +10,7 @@ import okhttp3.Call;
  */
 
 public abstract class  ResponseCallBack<T> {
-     protected Class <T>  tClass = (Class <T>) ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[ 0 ];
+     Class <T>  tClass = (Class <T>) ((ParameterizedType) getClass().getGenericSuperclass()).getActualTypeArguments()[ 0 ];
      public abstract void onFailure(Call request, Exception e);
      public abstract void onSucceeded(Call call,T result);
 

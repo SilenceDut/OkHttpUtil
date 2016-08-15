@@ -20,6 +20,10 @@ import okhttp3.Response;
  */
 
 public class OkHttpUtil {
+    public enum PostThread {
+        UI_THREAD,WORK_THREAD
+    }
+
     private OkHttpClient mOkHttpClient;
     private Gson mGson = new Gson();
     private Handler mMainHandler;
@@ -45,59 +49,56 @@ public class OkHttpUtil {
         this.mOkHttpClient = okHttpClient;
     }
 
-    public OkHttpClient getOkHttpClient() {
-        return mOkHttpClient;
-    }
 
-    public <T> void getAsync(final String url,final ResponseCallBack<T> responseCallBack) {
-
-        get(url, responseCallBack, true);
-    }
-
-
-    public <T> void getOnWorkThread(final String url,final ResponseCallBack<T> responseCallBack) {
-
-        get(url, responseCallBack, false);
-    }
-
-    /**
-     *
-     * @param url a http request url
-     * @param responseCallBack a callback where you can handle the result
-     * @param <T> class type which you want convert to
-     * @param postToUIThread if execute the responseCallBack on  UI Thread
-     */
-    private <T> void get(String url,  final ResponseCallBack<T> responseCallBack,final boolean postToUIThread) {
-
+    public <T> void getAsync(final String url,PostThread postThread,final ResponseCallBack<T> responseCallBack) {
         final Request request = new Request.Builder()
                 .url(url)
                 .build();
+        boolean runOnUIThread = PostThread.UI_THREAD.equals(postThread);
+        executeRequest(request,runOnUIThread,responseCallBack);
+    }
+
+
+    /**
+     *
+     * @param request a http request
+     * @param responseCallBack a callback where you can handle the result
+     * @param <T> class type which you want convert to
+     * @param postToUIThread if execute the responseCallBack on UI Thread
+     */
+    private <T> void executeRequest(Request request,final boolean postToUIThread,final ResponseCallBack<T> responseCallBack) {
+
         Call newCall = mOkHttpClient.newCall(request);
-        mCallMap.put(url,newCall);
+        mCallMap.put(request.tag().toString(),newCall);
 
-            newCall.enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    postFailInformation(responseCallBack,call,e,postToUIThread);
-                    mCallMap.remove(call.request().url());
-                }
+        newCall.enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                postFailInformation(call,e,postToUIThread,responseCallBack);
+                mCallMap.remove(call.request().tag().toString());
+            }
 
-                @Override
-                public void onResponse( Call call, Response response) throws IOException {
-                    mCallMap.remove(call.request().url());
-                    try {
-                        final T result = mGson.fromJson(response.body().string(),responseCallBack.tClass);
-                        postSuccessResult(responseCallBack,call,result,postToUIThread);
-                    }catch (Exception e) {
-                        postFailInformation(responseCallBack,call,e,postToUIThread);
+            @Override
+            public void onResponse( Call call, Response response) throws IOException {
+                T result ;
+                mCallMap.remove(call.request().tag().toString());
+                try {
+                    if(String.class.equals(responseCallBack.tClass)) {
+                        result = (T) response.body().string();
+                    }else {
+                        result = mGson.fromJson(response.body().string(), responseCallBack.tClass);
                     }
+                    postSuccessResult(call,result,postToUIThread,responseCallBack);
+                }catch (Exception e) {
+                    postFailInformation(call,e,postToUIThread,responseCallBack);
                 }
-            });
+            }
+        });
 
 
     }
 
-    private <T >void postSuccessResult(final ResponseCallBack<T> responseCallBack,final Call call,final T result,boolean postToUIThread) {
+    private <T >void postSuccessResult(final Call call,final T result,boolean postToUIThread,final ResponseCallBack<T> responseCallBack) {
         if(!postToUIThread) {
             responseCallBack.onSucceeded(call,result);
             return;
@@ -110,7 +111,7 @@ public class OkHttpUtil {
         });
     }
 
-    private  void postFailInformation(final ResponseCallBack responseCallBack,final Call call,final Exception e,boolean postToUIThread) {
+    private  void postFailInformation(final Call call,final Exception e,boolean postToUIThread,final ResponseCallBack responseCallBack) {
         if(!postToUIThread) {
             responseCallBack.onFailure(call,e);
             return;
@@ -131,6 +132,7 @@ public class OkHttpUtil {
         mCallMap.remove(url);
     }
 
+
     public void cancelAllRequests (){
         if(mMainHandler==null) {
             return;
@@ -144,6 +146,5 @@ public class OkHttpUtil {
         }
         mCallMap.clear();
     }
-
 
 }
