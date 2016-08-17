@@ -80,7 +80,12 @@ public class OkHttpUtil {
             @Override
             public void onResponse( Call call, Response response) throws IOException {
                 T result ;
+                if(response!=null&&!response.isSuccessful()) {
+                    postFailInformation(call,new Exception(String.format("request failed , code is %s",response.code())),
+                            postToUIThread,responseCallBack);
 
+                    return;
+                }
                 try {
                     if(String.class.equals(responseCallBack.tClass)) {
                         result = (T) response.body().string();
